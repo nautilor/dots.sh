@@ -16,6 +16,7 @@ Describe your symlinks in `dots.yaml`. Keep them in one repo, many repos, or a m
 - **Safe.** Never overwrites anything. If a destination already exists and isn't the right symlink, you get a warning and the file is left alone.
 - **Single or multi repo.** Pull parts of your setup from other git repositories with a `remote:` entry. Those repos bring their own `dots.yaml`.
 - **Reproducible.** Remotes are pinned in a `dots.lock` file, like `flake.lock` or `package-lock.json`.
+- **Inline files.** Write a small config straight into `dots.yaml` with `content:`, no separate file needed.
 - **Targeted.** Update or undo one entry without touching the rest.
 - **Dependency-light.** Needs only `bash` (4.3+), `git` (for remotes) and GNU `realpath`/`readlink`. No `yq`, no Python.
 
@@ -83,6 +84,7 @@ quickshell:                   # a group of entries
 | --- | --- |
 | `source` | What to link to. Relative paths are resolved against the folder of the `dots.yaml` that contains them. Absolute paths work too. |
 | `destination` | Where the symlink goes. `~`, `$HOME` and trailing slashes are fine. |
+| `content` | Text to put in the file instead of linking an existing one. See [Inline content](#inline-content). Wins over `source`. |
 | `remote` | A git repository to clone. See [Remote repositories](#remote-repositories). |
 | `ref` | Optional branch or tag for a `remote`. |
 | `post_update` | Optional shell command to run after a `remote` is updated. |
@@ -99,6 +101,41 @@ Each entry is shown by its path in the file, such as `zsh/.zshrc` or `quickshell
 | a real file or folder | **warning**, left alone |
 
 If any warning or error was reported, the exit code is `1`.
+
+## Inline content
+
+For small files, skip the separate source file and put the text in `dots.yaml`:
+
+```yaml
+git:
+    .gitconfig:
+        content: |
+            [user]
+                name = Me
+                email = me@example.com
+            [core]
+                editor = nvim
+        destination: "~/.gitconfig"
+```
+
+`dots.sh` writes the text to `~/.local/share/dots/.content/<entry path>` (here `.content/git/.gitconfig`) and symlinks the destination to it, exactly as it would for a `source`. Edit the text in `dots.yaml` and run `dots.sh` again: the stored file is rewritten and the existing link keeps working.
+
+- `content` needs a `destination` and no `source`. If both `source` and `content` are set, you get a warning and `content` is used.
+- Use a block scalar (`|`) for multi-line text. It follows the usual YAML rules:
+
+  | Style | Result |
+  | --- | --- |
+  | `\|` | lines kept as written, one trailing newline |
+  | `\|-` | same, no trailing newline |
+  | `\|+` | same, trailing blank lines kept |
+  | `>` / `>-` | lines folded into paragraphs |
+  | `"a\nb"` | single line, `\n` `\t` `\"` `\\` are expanded |
+  | `'a\nb'` | single line, taken literally |
+
+- A plain one-line value has no trailing newline. Use `|` if you want one.
+- `content: ""` creates an empty file.
+- The stored files are not deleted when you remove an entry or run `--undo`. The symlink is removed, the file stays in `.content/`.
+- Content works inside remote repositories too, and is stored under the remote's name.
 
 ## Remote repositories
 
@@ -268,7 +305,7 @@ It also warns if a clone is on a different commit than `dots.lock` says.
 
 ## Good to know
 
-- The YAML parser is built into the script and understands only the nested `key: value` form shown here. Quotes and `#` comments are fine. Lists, anchors and multi-line values are not supported, and you'll get an "unsupported yaml" notice for such lines.
+- The YAML parser is built into the script and understands only the nested `key: value` form shown here. Quotes and `#` comments are fine. Block scalars (`|`, `>`) work for any value, which is what `content` uses. Lists, anchors and other multi-line forms are not supported, and you'll get an "unsupported yaml" notice for such lines.
 - Symlinks are created with absolute paths.
 - `dots.lock` lives next to the main `dots.yaml`, not inside the clone folder.
 - Remote clones are named after their entry (`quickshell/sub` becomes `quickshell-sub`), so two entries pointing at the same repository get separate clones.
