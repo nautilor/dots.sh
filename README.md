@@ -16,6 +16,7 @@ Describe your symlinks in `dots.yaml`. Keep them in one repo, many repos, or a m
 - **Safe.** Never overwrites anything. If a destination already exists and isn't the right symlink, you get a warning and the file is left alone.
 - **Single or multi repo.** Pull parts of your setup from other git repositories with a `remote:` entry. Those repos bring their own `dots.yaml`.
 - **Reproducible.** Remotes are pinned in a `dots.lock` file, like `flake.lock` or `package-lock.json`.
+- **Stow-style packages.** Mirror a whole folder tree into `~` with `stow: true`, no GNU stow needed.
 - **Inline files.** Write a small config straight into `dots.yaml` with `content:`, no separate file needed.
 - **Targeted.** Update or undo one entry without touching the rest.
 - **Dependency-light.** Needs only `bash` (4.3+), `git` (for remotes) and GNU `realpath`/`readlink`. No `yq`, no Python.
@@ -84,6 +85,7 @@ quickshell:                   # a group of entries
 | --- | --- |
 | `source` | What to link to. Relative paths are resolved against the folder of the `dots.yaml` that contains them. Absolute paths work too. |
 | `destination` | Where the symlink goes. `~`, `$HOME` and trailing slashes are fine. |
+| `stow` | `true` to treat `source` as a package folder and mirror its tree into `destination`. See [Stow-style packages](#stow-style-packages). `use_stow` is accepted as an alias. |
 | `content` | Text to put in the file instead of linking an existing one. See [Inline content](#inline-content). Wins over `source`. |
 | `remote` | A git repository to clone. See [Remote repositories](#remote-repositories). |
 | `ref` | Optional branch or tag for a `remote`. |
@@ -101,6 +103,52 @@ Each entry is shown by its path in the file, such as `zsh/.zshrc` or `quickshell
 | a real file or folder | **warning**, left alone |
 
 If any warning or error was reported, the exit code is `1`.
+
+## Stow-style packages
+
+If you keep each program's files laid out the way they should appear in your home directory, you don't have to list every file:
+
+```
+dotfiles/
+├── dots.yaml
+└── kitty/
+    └── .config/
+        └── kitty/
+            └── kitty.conf
+```
+
+```yaml
+kitty:
+    stow: true
+```
+
+`dots.sh` walks `./kitty` and mirrors it into `~`, so `~/.config/kitty` becomes a symlink to `dotfiles/kitty/.config/kitty`. This is what GNU stow does, without needing stow installed.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `stow` | | `true` turns the mode on (`false` turns it off). `use_stow` works too. |
+| `source` | `./<entry name>` | The package folder, relative to the `dots.yaml` that declares it. |
+| `destination` | `~` | The folder the package is mirrored into. |
+
+```yaml
+kitty:
+    source: ./custom_kitty      # package folder is dotfiles/custom_kitty
+    stow: true
+
+work-tools:
+    stow: true
+    destination: "~/work"       # mirror into ~/work instead of ~
+```
+
+How the tree is linked:
+
+- Files are linked one by one.
+- A directory is linked **as a whole** when nothing exists at its destination yet, like stow's "folding". That is why `~/.config/kitty` is a single link above, so files you add to the package later show up without relinking.
+- If the destination directory already exists as a real folder, `dots.sh` goes inside it and links the entries separately. Your existing files are never touched.
+- The package's top-level folders (`.config`, `.local`, ...) are never linked as a whole. They are created as normal folders so a package can't take over `~/.config` by itself.
+- Anything in the way (a real file, or a link to somewhere else) gives the usual warning and is left alone.
+
+`status`, `--undo kitty` and `--update` work on these entries like any other. `--undo kitty` removes only the links it created; empty folders stay.
 
 ## Inline content
 
