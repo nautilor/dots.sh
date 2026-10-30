@@ -83,11 +83,11 @@ quickshell:                   # a group of entries
 
 | Key | Meaning |
 | --- | --- |
-| `source` | What to link to. Relative paths are resolved against the folder of the `dots.yaml` that contains them. Absolute paths work too. |
+| `source` | What to link to. Relative paths are resolved against the folder of the `dots.yaml` that contains them (next to a `remote`, the cloned repo). Absolute paths work too. |
 | `destination` | Where the symlink goes. `~`, `$HOME` and trailing slashes are fine. |
 | `stow` | `true` to treat `source` as a package folder and mirror its tree into `destination`. See [Stow-style packages](#stow-style-packages). `use_stow` is accepted as an alias. |
 | `content` | Text to put in the file instead of linking an existing one. See [Inline content](#inline-content). Wins over `source`. |
-| `remote` | A git repository to clone. See [Remote repositories](#remote-repositories). |
+| `remote` | A git repository to clone. See [Remote repositories](#remote-repositories). With `source` and `destination` beside it, those replace the repository's own `dots.yaml`. |
 | `ref` | Optional branch or tag for a `remote`. |
 | `post_update` | Optional shell command to run after a `remote` is updated. |
 
@@ -213,6 +213,23 @@ quickshell:
     remote: "github:user/repo"
     ref: "stable"
 ```
+
+### Overriding what a remote links
+
+By default a remote's own `dots.yaml` decides what gets linked. Put `source` and `destination` right next to `remote:` and they are used **instead**:
+
+```yaml
+kitty:
+    remote: "github:user/kitty-config"
+    source: "./kitty.conf"                  # relative to the cloned repo
+    destination: "~/.config/kitty/kitty.conf"
+```
+
+The repository's `dots.yaml` is then ignored, and **it doesn't need to have one**. That lets you pull a file or folder out of any git repository, such as a theme or a plugin, even if its author has never heard of `dots.sh`.
+
+- `source` and `destination` must both be set. With only one, you get an error.
+- Without them, a remote that has no `dots.yaml` is an error.
+- Locking, `--update`, `--undo`, `status` and `post_update` work the same as for any other remote.
 
 ### Mixing local and remote
 
